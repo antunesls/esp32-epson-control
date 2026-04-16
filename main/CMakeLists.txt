@@ -1,0 +1,22 @@
+idf_component_register(
+    SRCS
+        "main.c"
+        "nvs_storage.c"
+        "wifi_manager.c"
+        "uart_rs232.c"
+        "epson_protocol.c"
+        "web_server.c"
+        "udp_server.c"
+    INCLUDE_DIRS "."
+    REQUIRES
+        nvs_flash
+        esp_wifi
+        esp_event
+        esp_netif
+        esp_http_server
+        app_update
+        driver
+        json
+        lwip
+        esp_timer
+)
