@@ -47,8 +47,8 @@ void app_main(void)
     ESP_ERROR_CHECK(nvs_storage_init());
     ESP_ERROR_CHECK(nvs_storage_load(&s_cfg));
 
-    if (!s_cfg.provisioned) {
-        /* ---- FIRST BOOT: AP mode ---- */
+    if (!s_cfg.provisioned || s_cfg.wifi_ssid[0] == '\0') {
+        /* ---- FIRST BOOT (or NVS stale): AP mode ---- */
         ESP_LOGI(TAG, "Not provisioned — starting AP mode");
         ESP_ERROR_CHECK(wifi_manager_init_ap());
         /* Start web server with only setup/config routes */

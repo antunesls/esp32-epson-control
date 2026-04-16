@@ -46,29 +46,46 @@ static void sta_event_handler(void *arg, esp_event_base_t base,
 
 esp_err_t wifi_manager_init_ap(void)
 {
-    esp_netif_init();
-    esp_event_loop_create_default();
+    esp_err_t err;
+
+    err = esp_netif_init();
+    if (err != ESP_OK && err != ESP_ERR_INVALID_STATE) {
+        ESP_LOGE(TAG, "esp_netif_init failed: %s", esp_err_to_name(err));
+        return err;
+    }
+
+    err = esp_event_loop_create_default();
+    if (err != ESP_OK && err != ESP_ERR_INVALID_STATE) {
+        ESP_LOGE(TAG, "esp_event_loop_create_default failed: %s", esp_err_to_name(err));
+        return err;
+    }
+
     esp_netif_create_default_wifi_ap();
 
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
     ESP_ERROR_CHECK(esp_wifi_init(&cfg));
 
-    wifi_config_t ap_cfg = {
-        .ap = {
-            .ssid            = WIFI_AP_SSID,
-            .ssid_len        = strlen(WIFI_AP_SSID),
-            .channel         = WIFI_AP_CHANNEL,
-            .password        = WIFI_AP_PASS,
-            .max_connection  = WIFI_AP_MAX_CONN,
-            .authmode        = WIFI_AUTH_WPA2_PSK,
-        },
-    };
+    /* Use memcpy to avoid issues with compiler treatment of uint8_t[] init */
+    wifi_config_t ap_cfg = {0};
+    memcpy(ap_cfg.ap.ssid,     WIFI_AP_SSID, strlen(WIFI_AP_SSID));
+    memcpy(ap_cfg.ap.password, WIFI_AP_PASS, strlen(WIFI_AP_PASS));
+    ap_cfg.ap.ssid_len       = strlen(WIFI_AP_SSID);
+    ap_cfg.ap.channel        = WIFI_AP_CHANNEL;
+    ap_cfg.ap.max_connection = WIFI_AP_MAX_CONN;
+    /* WPA_WPA2_PSK is more compatible; WPA2-only may cause PMF issues in IDF v5 */
+    ap_cfg.ap.authmode             = WIFI_AUTH_WPA_WPA2_PSK;
+    ap_cfg.ap.pmf_cfg.required     = false;
+    ap_cfg.ap.beacon_interval      = 100;
 
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_AP));
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_AP, &ap_cfg));
     ESP_ERROR_CHECK(esp_wifi_start());
 
-    ESP_LOGI(TAG, "AP started: SSID=%s PASS=%s", WIFI_AP_SSID, WIFI_AP_PASS);
+    /* Increase TX power to maximum (20 dBm) — important for small PCB antenna boards
+     * like Waveshare ESP32-S3-Zero. Value is in units of 0.25 dBm, so 80 = 20 dBm. */
+    ESP_ERROR_CHECK(esp_wifi_set_max_tx_power(80));
+
+    ESP_LOGI(TAG, "AP started: SSID=%s PASS=%s TX_power=20dBm", WIFI_AP_SSID, WIFI_AP_PASS);
     return ESP_OK;
 }
 
@@ -79,8 +96,13 @@ esp_err_t wifi_manager_init_sta(const char *ssid, const char *pass,
     s_retry_count   = 0;
     s_wifi_event_group = xEventGroupCreate();
 
-    esp_netif_init();
-    esp_event_loop_create_default();
+    esp_err_t err;
+    err = esp_netif_init();
+    if (err != ESP_OK && err != ESP_ERR_INVALID_STATE) return err;
+
+    err = esp_event_loop_create_default();
+    if (err != ESP_OK && err != ESP_ERR_INVALID_STATE) return err;
+
     esp_netif_create_default_wifi_sta();
 
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
